@@ -12,14 +12,19 @@ import time
 from time import localtime, strftime
 from grab.spider import Spider, Task
 
-imgDict = {}
+imgDict = typeDict = {}
 sitePath = 'realty_dmir/'
 
 class SitePars(Spider):
-	initial_urls = ['http://realty.dmir.ru/msk/sale-tbl/prodazha-kvartir-v-moskve/?csort=best&page=1']
+	initial_urls = ['http://realty.dmir.ru/msk/sale-tbl/prodazha-novostroek-v-moskve/',
+					'http://realty.dmir.ru/msk/sale-tbl/prodazha-kvartir-v-moskve/']
 
 	def prepare(self):
-		os.mkdir(self.glb.envOutput + sitePath)
+		try:
+			os.mkdir(self.glb.envOutput + sitePath)
+		except OSError:
+			print 'Folder ' + sitePath + ' exists. Was not created'
+
 		self.result_file = open(self.glb.envOutput + 'realty.dmir.txt', 'w')
 		self.result_file.write('ID объекта;Тип недвижимости;Адрес;Станция метро;Этаж/Этажность;Количество комнат;Площадь общая;Площадь жилая;\
 	Площадь кухни;Вид передаваемого права;Цена продажи;Дата предложения;Описание;Агентство;Телефон;Ссылка\n')
@@ -27,15 +32,28 @@ class SitePars(Spider):
 	#определяем номер последней страницы навигации. НАДО АВТОМАТИЗИРОВАТЬ
 	def task_initial(self, grab, task):
 		#база меняется через каждые 5 минут. Доступно всего 9 страниц. Делаем повторы перебора
-		for i in range(1,42):
+		if task.url.split('/')[-2] == 'prodazha-novostroek-v-moskve':
 			num_of_pages = 1
 			for n in range(1, num_of_pages + 8):
-				yield Task('nav', url = 'http://realty.dmir.ru/msk/sale-tbl/prodazha-kvartir-v-moskve/?csort=best&page=%s' % n)
+				yield Task('nav', url = 'http://realty.dmir.ru/msk/sale-tbl/prodazha-novostroek-v-moskve/?page=%s' % n)
+
+		if task.url.split('/')[-2] == 'prodazha-kvartir-v-moskve':
+			num_of_pages = 1
+			for n in range(1, num_of_pages + 8):
+				yield Task('nav', url = 'http://realty.dmir.ru/msk/sale-tbl/prodazha-kvartir-v-moskve/?page=%s' % n)
+
 
 	#перебираем навигационные страницы и ищем ссылки на карточки
 	def task_nav(self, grab, task):
-		for elem in grab.tree.xpath('//a[@class="view-img"]/@href'):
-			yield Task('dmirobject', url=grab.make_url_absolute(elem))
+		if task.url.split('/')[-2] == 'prodazha-novostroek-v-moskve':
+			for elem in grab.tree.xpath('//a[@class="view-img"]/@href'):
+				typeDict[grab.make_url_absolute(elem)] = 'Новостройка;'
+				yield Task('dmirobject', url=grab.make_url_absolute(elem))
+
+		if task.url.split('/')[-2] == 'prodazha-kvartir-v-moskve':
+			for elem in grab.tree.xpath('//a[@class="view-img"]/@href'):
+				typeDict[grab.make_url_absolute(elem)] = 'Вторичка;'
+				yield Task('dmirobject', url=grab.make_url_absolute(elem))
 
 	def task_dmirobject(self, grab, task):
 		global imgDict
@@ -54,7 +72,7 @@ class SitePars(Spider):
 		rType = 'Квартира;'
 
 		#вид передаваемого права
-		rRights = 'Вторичка;'
+		rRights = typeDict[task.url]
 
 		#стоимость
 		temp = grab.xpath('//span[@id="price_offer"]')
@@ -146,8 +164,9 @@ class SitePars(Spider):
 		#меняем каталог для работы с фс
 		os.chdir(self.glb.envOutput + sitePath)
 		try:
-			os.mkdir(objID)
-		except:
+			if cleanFlag == False:
+				os.mkdir(objID)
+		except OSError:
 			cleanFlag = True
 
 		#пишем в файл
