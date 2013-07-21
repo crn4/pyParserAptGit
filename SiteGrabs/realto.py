@@ -12,7 +12,12 @@ from time import localtime, strftime
 from grab import Grab
 from grab.spider import Spider, Task
 
-from Modules.webkit2png import ShootOne
+try:
+	from Modules.webkit2png import ShootOne
+except:
+	print "mighty_z's modules was not imported"
+
+sitePath = 'realto/'
 
 class SitePars(Spider):
 	initial_urls = [
@@ -25,6 +30,12 @@ class SitePars(Spider):
 	
 	#create output files
 	def prepare(self):
+		
+		try:
+			os.mkdir(self.glb.envOutput + sitePath)
+		except OSError:
+			print 'Folder ' + sitePath + ' exists. Was not created'
+
 		self.result_file = open(self.glb.envOutput + 'realto.txt', 'w')
 		self.result_file.write('ID объекта;' + \
 							   'Тип недвижимости;Адрес;Станция метро;' + \
@@ -66,6 +77,8 @@ class SitePars(Spider):
 			sOutDate = sOutDescription = sOutAgency = sOutPhone = \
 				';'
 		
+		scrFolder = ''
+
 		#dictionary for tmp information cells
 		dCells = {}
 					
@@ -104,10 +117,16 @@ class SitePars(Spider):
 		#print sOutRoomCount.encode('utf-8')
 
 		if u'Площади(общая/жилая/кухня)' in dCells:
-			listSpace = dCells[u'Площади(общая/жилая/кухня)'].split(' / ')
-			sOutFloorSpace = listSpace[0] + ';'
-			sOutLivingSpace = listSpace[1] + ';'
-			sOutKitchenSpace = listSpace[2] + ';'
+			listSpace = dCells[u'Площади(общая/жилая/кухня)'].split('/')
+			try:
+				sOutFloorSpace = str(listSpace[0]).strip() + ';'
+				sOutLivingSpace = str(listSpace[1]).strip() + ';'
+				sOutKitchenSpace = str(listSpace[2]).strip() + ';'
+			except IndexError:
+				print '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!' + task.url
+				sOutFloorSpace = str(dCells[u'Площади(общая/жилая/кухня)']).strip() + ';'
+				sOutLivingSpace = ';'
+				sOutKitchenSpace = ';'
 		#print sOutFloorSpace.encode('utf-8')
 		#print sOutLivingSpace.encode('utf-8')
 		#print sOutKitchenSpace.encode('utf-8')
@@ -149,7 +168,7 @@ class SitePars(Spider):
 		sOutputLine = sOutputLine.replace('&quot;','')
 		self.result_file.write(sOutputLine.encode('utf-8'))
 
-		sImgFolder = self.glb.envImgOutput + '/realto/' + sObjId + '/'
+		sImgFolder = self.glb.envOutput + 'realto/' + sObjId + '/'
 
 		#saving images
 		for urlPhoto in grab.doc.select('//td[@class="base_one_text"]//img'):
@@ -161,7 +180,8 @@ class SitePars(Spider):
 		if self.glb.usrFlag == 1:
 			ShootOne(task.url, self.glb.envDir, sImgFolder, 'screenshot')
 		elif self.glb.usrFlag == -1:
-			currCmd = 'python ' + '/root/Desktop/pyParser/webkit2png' + ' ' + task.url + ' -o ' + sImgFolder + 'screenshot' + '.png'
+			scrFolder = self.glb.envOutput + sitePath + sObjId
+			currCmd = 'python ' + '/root/Desktop/pyParser/webkit2png' + ' ' + task.url + ' -f jpg -o ' + scrFolder + '/' + sObjId + '.jpg'
 				
 
 #=============================================
